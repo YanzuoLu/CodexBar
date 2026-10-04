@@ -112,10 +112,10 @@ the cookie import.
 - With direct-read consent, OAuth repair first reads `Claude Code-credentials` through `/usr/bin/security`, but only
   when a no-UI preflight shows that the item's decrypt ACL trusts `/usr/bin/security` and its partition list
   includes `apple-tool:` (Claude Code's default, since it writes the item with that tool). That read cannot prompt,
-  so it runs in background refreshes and `codexbar usage --source oauth` under every prompt policy. The newest item's
-  account is pinned so the preflighted and read items match. A read that times out starts the six-hour denial
-  cooldown, which suppresses further background attempts. If the item exists but no prompt-free read is possible,
-  the error says so instead of reporting missing credentials.
+  so it runs in background refreshes, Auto's safe-source OAuth step, and `codexbar usage --source oauth` under every
+  prompt policy. The newest item's account is pinned so the preflighted and read items match. A read that times out
+  starts the six-hour denial cooldown, which suppresses further background attempts. If the item exists but no
+  prompt-free read is possible, the error says so instead of reporting missing credentials.
 - CodexBar's `Always allow prompts` permits future prompts; macOS's **Always Allow** grants access to the current
   Keychain item. Claude Code can recreate `Claude Code-credentials` and reset that grant. An ACL entry still named
   CodexBar does not prove that its stored code-signing requirement matches the running binary. `Only on user action`

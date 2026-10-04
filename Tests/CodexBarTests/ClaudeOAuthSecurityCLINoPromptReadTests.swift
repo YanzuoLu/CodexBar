@@ -19,7 +19,8 @@ struct ClaudeOAuthSecurityCLINoPromptReadTests {
     }
 
     /// Loads like the app's background refresh and `codexbar usage --source oauth`: no interactive prompt,
-    /// consented Keychain repair enabled, and Claude Code's item ACL rejecting CodexBar itself.
+    /// consented Keychain repair enabled (disabled for Auto's safe-source-only loads), and Claude Code's item ACL
+    /// rejecting CodexBar itself.
     private static func loadInBackground(
         consent: Bool,
         promptMode: ClaudeOAuthKeychainPromptMode = .onlyOnUserAction,
@@ -27,6 +28,7 @@ struct ClaudeOAuthSecurityCLINoPromptReadTests {
         securityRead: Store.SecurityCLIReadOverride,
         deniedUntil: ClaudeOAuthKeychainAccessGate.DeniedUntilStore = .init(),
         itemPresent: Bool? = nil,
+        safeSourcesOnly: Bool = false,
         recorder: Recorder) throws -> ClaudeOAuthCredentialRecord
     {
         let fileURL = FileManager.default.temporaryDirectory
@@ -50,19 +52,19 @@ struct ClaudeOAuthSecurityCLINoPromptReadTests {
                         try ClaudeOAuthDirectKeychainReadConsent.withTaskOverrideForTesting(consent) {
                             try ClaudeOAuthKeychainPromptPreference.withTaskOverrideForTesting(promptMode) {
                                 try ClaudeOAuthKeychainAccessGate.withDeniedUntilStoreOverrideForTesting(deniedUntil) {
-                                    try KeychainAccessPreflight.withReaderCheckGenericPasswordOverrideForTesting(
+                                    try KeychainAccessPreflight.withReaderCheckGenericPasswordOverrideForTesting
                                         { _, _, reader in
                                             recorder.preflightReaders.append(reader)
                                             // Claude Code's ACL trusts only /usr/bin/security.
                                             return reader == .securityTool
                                                 ? securityToolPreflight
                                                 : .interactionRequired
-                                        },
-                                        operation: {
+                                        } operation: {
                                             try Self.loadWithSecurityCLIOverrides(
                                                 read: recordingRead,
-                                                itemPresent: itemPresent)
-                                        })
+                                                itemPresent: itemPresent,
+                                                safeSourcesOnly: safeSourcesOnly)
+                                        }
                                 }
                             }
                         }
@@ -74,7 +76,8 @@ struct ClaudeOAuthSecurityCLINoPromptReadTests {
 
     private static func loadWithSecurityCLIOverrides(
         read: Store.SecurityCLIReadOverride,
-        itemPresent: Bool?) throws -> ClaudeOAuthCredentialRecord
+        itemPresent: Bool?,
+        safeSourcesOnly: Bool) throws -> ClaudeOAuthCredentialRecord
     {
         try Store.withSecurityCLIReadAccountOverrideForTesting("claude-user") {
             try Store.withClaudeKeychainItemPresenceOverrideForTesting(itemPresent) {
@@ -84,7 +87,7 @@ struct ClaudeOAuthSecurityCLINoPromptReadTests {
                             environment: [:],
                             allowKeychainPrompt: false,
                             respectKeychainPromptCooldown: true,
-                            allowClaudeKeychainRepairWithoutPrompt: true)
+                            allowClaudeKeychainRepairWithoutPrompt: !safeSourcesOnly)
                     }
                 }
             }
@@ -108,6 +111,23 @@ struct ClaudeOAuthSecurityCLINoPromptReadTests {
         #expect(record.source == .claudeKeychain)
         #expect(recorder.securityReads == ["claude-user"])
         #expect(recorder.preflightReaders.contains(.securityTool))
+    }
+
+    @Test
+    func `auto safe-source load reads claude keychain through security CLI without prompt`() throws {
+        let recorder = Recorder()
+        let record = try Self.loadInBackground(
+            consent: true,
+            promptMode: .never,
+            securityToolPreflight: .allowed,
+            securityRead: .data(Self.credentialsData(accessToken: "auto-security-cli-token")),
+            safeSourcesOnly: true,
+            recorder: recorder)
+
+        #expect(record.credentials.accessToken == "auto-security-cli-token")
+        #expect(record.source == .claudeKeychain)
+        #expect(recorder.securityReads == ["claude-user"])
+        #expect(!recorder.preflightReaders.contains(.currentProcess))
     }
 
     @Test

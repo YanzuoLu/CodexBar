@@ -423,9 +423,10 @@ public enum ClaudeOAuthCredentialsStore {
                     return synced
                 }
 
-                if allowClaudeKeychainRepairWithoutPrompt, !allowKeychainPrompt,
-                   let repaired = recovery.repairFromClaudeKeychainWithoutPromptIfAllowed(
+                if !allowKeychainPrompt,
+                   let repaired = recovery.loadFromClaudeKeychainWithoutPrompt(
                        now: Date(),
+                       allowSecurityFrameworkRepair: allowClaudeKeychainRepairWithoutPrompt,
                        respectKeychainPromptCooldown: shouldRespectKeychainPromptCooldownForSilentProbes,
                        allowCacheKeychainWrite: !cacheTemporarilyUnavailable)
                 {
@@ -1120,13 +1121,15 @@ public enum ClaudeOAuthCredentialsStore {
             #endif
         }
 
-        func repairFromClaudeKeychainWithoutPromptIfAllowed(
+        /// The consented `/usr/bin/security` read is preflighted to be prompt-free, so it runs first and also serves
+        /// safe-source-only (Auto) loads; the Security.framework repair and its prompt-policy gates run only when
+        /// `allowSecurityFrameworkRepair` is set.
+        func loadFromClaudeKeychainWithoutPrompt(
             now: Date,
+            allowSecurityFrameworkRepair: Bool,
             respectKeychainPromptCooldown: Bool,
-            allowCacheKeychainWrite: Bool = true) -> ClaudeOAuthCredentialRecord?
+            allowCacheKeychainWrite: Bool) -> ClaudeOAuthCredentialRecord?
         {
-            #if os(macOS)
-            // Prompt-free by construction, so it precedes the Security.framework prompt-policy gates below.
             if let securityData = ClaudeOAuthCredentialsStore.readClaudeKeychainViaSecurityCLIWithoutPrompt(
                 interaction: ProviderInteractionContext.current,
                 now: now)
@@ -1136,7 +1139,19 @@ public enum ClaudeOAuthCredentialsStore {
                     now: now,
                     allowCacheKeychainWrite: allowCacheKeychainWrite)
             }
+            guard allowSecurityFrameworkRepair else { return nil }
+            return self.repairFromClaudeKeychainWithoutPromptIfAllowed(
+                now: now,
+                respectKeychainPromptCooldown: respectKeychainPromptCooldown,
+                allowCacheKeychainWrite: allowCacheKeychainWrite)
+        }
 
+        func repairFromClaudeKeychainWithoutPromptIfAllowed(
+            now: Date,
+            respectKeychainPromptCooldown: Bool,
+            allowCacheKeychainWrite: Bool = true) -> ClaudeOAuthCredentialRecord?
+        {
+            #if os(macOS)
             let mode = ClaudeOAuthKeychainPromptPreference.current()
             guard ClaudeOAuthCredentialsStore
                 .shouldAllowClaudeCodeKeychainAccess(mode: mode) else { return nil }
