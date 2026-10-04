@@ -232,8 +232,11 @@ public struct ClaudeUsageFetcher: ClaudeUsageFetching, Sendable {
 
     private static func assertDelegatedRefreshAllowedInCurrentInteraction(
         policy: ClaudeOAuthKeychainPromptPolicy,
-        allowBackgroundDelegatedRefresh: Bool) throws
+        allowBackgroundDelegatedRefresh: Bool,
+        promptFreeKeychainRead: Bool) throws
     {
+        // The prompt policy guards Keychain dialogs; a refresh whose item is proven prompt-free cannot raise one.
+        if promptFreeKeychainRead { return }
         if policy.mode == .never {
             throw ClaudeUsageError.oauthFailed("Delegated refresh is disabled by 'never' keychain policy.")
         }
@@ -402,9 +405,12 @@ public struct ClaudeUsageFetcher: ClaudeUsageFetching, Sendable {
             try Task.checkCancellation()
 
             let delegatedPromptPolicy = ClaudeUsageFetcher.currentClaudeOAuthDelegatedRefreshPolicy()
+            let promptFreeKeychainRead = ClaudeOAuthCredentialsStore
+                .isClaudeKeychainReadableViaSecurityCLIWithoutPrompt()
             try ClaudeUsageFetcher.assertDelegatedRefreshAllowedInCurrentInteraction(
                 policy: delegatedPromptPolicy,
-                allowBackgroundDelegatedRefresh: self.fetcher.allowBackgroundDelegatedRefresh)
+                allowBackgroundDelegatedRefresh: self.fetcher.allowBackgroundDelegatedRefresh,
+                promptFreeKeychainRead: promptFreeKeychainRead)
 
             let delegatedResult = await ClaudeUsageFetcher.attemptDelegatedRefresh(
                 environment: self.fetcher.configuration.environment)

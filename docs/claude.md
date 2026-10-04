@@ -115,7 +115,9 @@ the cookie import.
   so it runs in background refreshes, Auto's safe-source OAuth step, and `codexbar usage --source oauth` under every
   prompt policy. The newest item's account is pinned so the preflighted and read items match. A read that times out
   starts the six-hour denial cooldown, which suppresses further background attempts. If the item exists but no
-  prompt-free read is possible, the error says so instead of reporting missing credentials.
+  prompt-free read is possible, the error says so instead of reporting missing credentials. While that preflight
+  passes, an expired token may also be refreshed by running `claude` in the background under every prompt policy,
+  since `claude` reads and rewrites the item through the same tool.
 - CodexBar's `Always allow prompts` permits future prompts; macOS's **Always Allow** grants access to the current
   Keychain item. Claude Code can recreate `Claude Code-credentials` and reset that grant. An ACL entry still named
   CodexBar does not prove that its stored code-signing requirement matches the running binary. `Only on user action`

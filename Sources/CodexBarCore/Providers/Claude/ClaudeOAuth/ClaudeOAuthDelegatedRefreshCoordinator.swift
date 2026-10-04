@@ -122,6 +122,8 @@ public enum ClaudeOAuthDelegatedRefreshCoordinator {
         let promptMode: ClaudeOAuthKeychainPromptMode
         let keychainAccessDisabled: Bool
         let keychainReadAllowed: Bool
+        /// Claude Code's item is readable through `/usr/bin/security` without a prompt, the tool `claude` itself uses.
+        let promptFreeKeychainRead: Bool
         let hasSelectedProfileOAuthCredentialsFile: Bool
         #if DEBUG
         let cliAvailableOverride: Bool?
@@ -171,6 +173,7 @@ public enum ClaudeOAuthDelegatedRefreshCoordinator {
             promptMode: ClaudeOAuthKeychainPromptPreference.storedMode(),
             keychainAccessDisabled: KeychainAccessGate.isDisabled,
             keychainReadAllowed: ClaudeOAuthCredentialsStore.keychainAccessAllowed,
+            promptFreeKeychainRead: ClaudeOAuthCredentialsStore.isClaudeKeychainReadableViaSecurityCLIWithoutPrompt(),
             hasSelectedProfileOAuthCredentialsFile: ClaudeOAuthCredentialsStore
                 .hasSelectedProfileOAuthCredentialsFile(environment: environment),
             cliAvailableOverride: self.cliAvailableOverrideForTesting,
@@ -189,6 +192,7 @@ public enum ClaudeOAuthDelegatedRefreshCoordinator {
             promptMode: ClaudeOAuthKeychainPromptPreference.storedMode(),
             keychainAccessDisabled: KeychainAccessGate.isDisabled,
             keychainReadAllowed: ClaudeOAuthCredentialsStore.keychainAccessAllowed,
+            promptFreeKeychainRead: ClaudeOAuthCredentialsStore.isClaudeKeychainReadableViaSecurityCLIWithoutPrompt(),
             hasSelectedProfileOAuthCredentialsFile: ClaudeOAuthCredentialsStore
                 .hasSelectedProfileOAuthCredentialsFile(environment: environment))
         #endif
@@ -228,9 +232,11 @@ public enum ClaudeOAuthDelegatedRefreshCoordinator {
 
         // `/status` is an opaque Claude CLI invocation and may launch `/usr/bin/security` outside
         // CodexBar's own no-UI query controls. Background work may not cross that boundary unless
-        // the user explicitly opted into always allowing Keychain access.
+        // the user explicitly opted into always allowing Keychain access, or a no-UI preflight proved
+        // that `/usr/bin/security` reads Claude Code's item without a prompt.
         if configuration.interaction == .background,
-           configuration.keychainAccessDisabled || configuration.promptMode != .always
+           configuration.keychainAccessDisabled
+           || (configuration.promptMode != .always && !configuration.promptFreeKeychainRead)
         {
             self.log.info("Claude OAuth delegated refresh skipped by Keychain prompt policy")
             return AttemptResult(.skippedByPromptPolicy)

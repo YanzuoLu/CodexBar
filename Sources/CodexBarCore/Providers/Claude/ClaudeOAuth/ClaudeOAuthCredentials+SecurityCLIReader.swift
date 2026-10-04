@@ -103,6 +103,17 @@ extension ClaudeOAuthCredentialsStore {
             environment: environment).payload
     }
 
+    /// Whether Claude Code's item is readable through `/usr/bin/security` without a prompt right now: the user
+    /// consented to direct reads and a no-UI ACL preflight for that tool returns `.allowed`. The delegated `claude`
+    /// refresh reads and rewrites the item through the same tool, so it needs no prompt either.
+    static func isClaudeKeychainReadableViaSecurityCLIWithoutPrompt() -> Bool {
+        guard self.keychainAccessAllowed, let target = self.securityCLIReadTargetWithoutPrompt() else { return false }
+        return KeychainAccessPreflight.checkGenericPassword(
+            service: self.claudeKeychainService,
+            account: target.account,
+            reader: .securityTool) == .allowed
+    }
+
     /// Reads Claude Code's item through `/usr/bin/security` only when that read is proven prompt-free.
     ///
     /// Claude Code writes `Claude Code-credentials` through `/usr/bin/security`, so the item's decrypt ACL and
@@ -402,6 +413,10 @@ extension ClaudeOAuthCredentialsStore {
         -> Data?
     {
         nil
+    }
+
+    static func isClaudeKeychainReadableViaSecurityCLIWithoutPrompt() -> Bool {
+        false
     }
 
     static func readClaudeKeychainViaSecurityCLIWithoutPrompt(

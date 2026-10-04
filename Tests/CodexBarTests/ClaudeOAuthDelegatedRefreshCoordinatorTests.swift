@@ -871,3 +871,43 @@ struct ClaudeOAuthDelegatedRefreshCoordinatorTests {
         }
     }
 }
+
+extension ClaudeOAuthDelegatedRefreshCoordinatorTests {
+    /// Claude Code's item ACL admits only `/usr/bin/security`.
+    private static func securityToolOnlyPreflight(
+        service _: String,
+        account _: String?,
+        reader: KeychainAccessPreflight.Reader) -> KeychainAccessPreflight.Outcome
+    {
+        reader == .securityTool ? .allowed : .interactionRequired
+    }
+
+    @Test(arguments: [ClaudeOAuthKeychainPromptMode.never, .onlyOnUserAction])
+    func `background refresh launches delegated Claude CLI when security CLI reads the item without prompt`(
+        promptMode: ClaudeOAuthKeychainPromptMode) async
+    {
+        let touches = ClaudeDelegatedTouchCounter()
+        let outcome = await self.withCoordinatorOverrides(
+            cliAvailable: true,
+            promptMode: promptMode,
+            touchAuthPath: { _, _ in touches.increment() },
+            operation: {
+                await ClaudeOAuthDirectKeychainReadConsent.withTaskOverrideForTesting(true) {
+                    await ClaudeOAuthCredentialsStore.withSecurityCLIReadAccountOverrideForTesting("claude-user") {
+                        await KeychainAccessPreflight.withReaderCheckGenericPasswordOverrideForTesting(
+                            Self.securityToolOnlyPreflight)
+                        {
+                            await ProviderInteractionContext.$current.withValue(.background) {
+                                await ClaudeOAuthDelegatedRefreshCoordinator.attempt(
+                                    now: Date(timeIntervalSince1970: 20010),
+                                    timeout: 0.1)
+                            }
+                        }
+                    }
+                }
+            })
+
+        #expect(outcome != .skippedByPromptPolicy)
+        #expect(touches.count() == 1)
+    }
+}
