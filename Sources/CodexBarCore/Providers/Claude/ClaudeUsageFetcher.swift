@@ -354,10 +354,14 @@ public struct ClaudeUsageFetcher: ClaudeUsageFetching, Sendable {
                 if case .refreshDelegatedToClaudeCLI = error {
                     return try await self.loadAfterDelegatedRefresh(allowDelegatedRetry: allowDelegatedRetry)
                 }
-                // Preserve exact absence as a typed result so the app's explicit OAuth route may use
-                // its credential-owning CLI fallback. Every other credential error remains terminal.
-                if case .notFound = error {
+                // Preserve exact absence, and an existing item that cannot be read without a prompt, as typed
+                // results so the app's explicit OAuth route may use its credential-owning CLI fallback.
+                // Every other credential error remains terminal.
+                switch error {
+                case .notFound, .keychainReadRequiresInteraction:
                     throw error
+                default:
+                    break
                 }
                 throw ClaudeUsageError.oauthFailed(error.localizedDescription)
             } catch let error as ClaudeOAuthFetchError {

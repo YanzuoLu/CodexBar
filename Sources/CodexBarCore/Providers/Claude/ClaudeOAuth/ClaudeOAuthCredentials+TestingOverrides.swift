@@ -336,6 +336,7 @@ extension ClaudeOAuthCredentialsStore {
     @TaskLocal static var taskCredentialsFileFingerprintStoreOverride: CredentialsFileFingerprintStore?
     @TaskLocal static var taskSecurityCLIReadOverride: SecurityCLIReadOverride?
     @TaskLocal static var taskSecurityCLIReadAccountOverride: String?
+    @TaskLocal static var taskClaudeKeychainItemPresenceOverride: Bool?
 
     public struct TestingOverridesSnapshot: Sendable {
         let keychainOverrideStore: ClaudeKeychainOverrideStore?
@@ -508,6 +509,15 @@ extension ClaudeOAuthCredentialsStore {
 
     static func currentSecurityCLIReadOverrideForTesting() -> SecurityCLIReadOverride? {
         self.taskSecurityCLIReadOverride
+    }
+
+    static func withClaudeKeychainItemPresenceOverrideForTesting<T>(
+        _ present: Bool?,
+        operation: () throws -> T) rethrows -> T
+    {
+        try self.$taskClaudeKeychainItemPresenceOverride.withValue(present) {
+            try operation()
+        }
     }
 
     static func withSecurityCLIReadAccountOverrideForTesting<T>(

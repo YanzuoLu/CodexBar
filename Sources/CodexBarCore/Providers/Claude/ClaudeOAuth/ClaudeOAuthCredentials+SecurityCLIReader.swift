@@ -97,11 +97,72 @@ extension ClaudeOAuthCredentialsStore {
         guard self.keychainAccessAllowed else { return nil }
         let mode = ClaudeOAuthKeychainPromptPreference.storedMode()
         guard mode == .always || mode == .onlyOnUserAction && interaction == .userInitiated else { return nil }
+        return self.runSecurityCLIKeychainRead(
+            account: self.preferredClaudeKeychainAccountForSecurityCLIRead(interaction: interaction),
+            interaction: interaction,
+            environment: environment).payload
+    }
+
+    /// Reads Claude Code's item through `/usr/bin/security` only when that read is proven prompt-free.
+    ///
+    /// Claude Code writes `Claude Code-credentials` through `/usr/bin/security`, so the item's decrypt ACL and
+    /// partition list normally admit that tool and nothing else. Security.framework reads from CodexBar then need a
+    /// Keychain dialog, while the same read through `/usr/bin/security` needs none. This path runs only when the
+    /// user consented to direct reads and a no-UI ACL preflight evaluated for `/usr/bin/security` returns `.allowed`.
+    /// It does not depend on the Security.framework prompt policy because it never asks for interaction. A read that
+    /// still times out (the signature of a dialog the preflight did not predict) starts the shared denial cooldown,
+    /// which suppresses further background attempts.
+    static func readClaudeKeychainViaSecurityCLIWithoutPrompt(
+        interaction: ProviderInteraction,
+        now: Date = Date(),
+        environment: [String: String] = ProcessInfo.processInfo.environment) -> Data?
+    {
+        guard self.keychainAccessAllowed else { return nil }
+        let interactionMetadata = interaction == .userInitiated ? "user" : "background"
+        if interaction != .userInitiated, !ClaudeOAuthKeychainAccessGate.shouldAllowPrompt(now: now) {
+            self.log.debug(
+                "Claude keychain security CLI no-prompt read skipped during denial cooldown",
+                metadata: ["reader": "securityCLI", "callerInteraction": interactionMetadata])
+            return nil
+        }
+        guard let target = self.securityCLIReadTargetWithoutPrompt() else { return nil }
+        let preflight = KeychainAccessPreflight.checkGenericPassword(
+            service: self.claudeKeychainService,
+            account: target.account,
+            reader: .securityTool)
+        guard preflight == .allowed else {
+            self.log.info(
+                "Claude keychain item is not readable by /usr/bin/security without a prompt; skipping",
+                metadata: [
+                    "reader": "securityCLI",
+                    "callerInteraction": interactionMetadata,
+                    "preflight": String(describing: preflight),
+                ])
+            return nil
+        }
+        let result = self.runSecurityCLIKeychainRead(
+            account: target.account,
+            interaction: interaction,
+            environment: environment)
+        if result.timedOut {
+            ClaudeOAuthKeychainAccessGate.recordDenied(now: now)
+        }
+        return result.payload
+    }
+
+    private struct SecurityCLIKeychainReadResult {
+        var payload: Data?
+        var timedOut = false
+    }
+
+    private static func runSecurityCLIKeychainRead(
+        account preferredAccount: String?,
+        interaction: ProviderInteraction,
+        environment: [String: String]) -> SecurityCLIKeychainReadResult
+    {
         let interactionMetadata = interaction == .userInitiated ? "user" : "background"
 
         do {
-            let preferredAccount = self.preferredClaudeKeychainAccountForSecurityCLIRead(
-                interaction: interaction)
             let output: Data
             let status: Int32
             let stderrLength: Int
@@ -146,7 +207,7 @@ extension ClaudeOAuthCredentialsStore {
             #endif
 
             let sanitized = self.sanitizeSecurityCLIOutput(output)
-            guard !sanitized.isEmpty else { return nil }
+            guard !sanitized.isEmpty else { return SecurityCLIKeychainReadResult() }
             if ClaudeOAuthCredentials.isMcpOAuthOnlyPayload(data: sanitized) {
                 self.log.warning(
                     "Claude keychain security CLI output is MCP OAuth only; falling back",
@@ -170,7 +231,7 @@ extension ClaudeOAuthCredentialsStore {
                         "payload_bytes": "\(sanitized.count)",
                     ])
             }
-            return sanitized
+            return SecurityCLIKeychainReadResult(payload: sanitized)
         } catch let error as SecurityCLIReadError {
             var metadata: [String: String] = [
                 "reader": "securityCLI",
@@ -192,7 +253,10 @@ extension ClaudeOAuthCredentialsStore {
                 metadata["stderr_length"] = "\(stderrLength)"
             }
             self.log.warning("Claude keychain security CLI read failed; falling back", metadata: metadata)
-            return nil
+            if case .timedOut = error {
+                return SecurityCLIKeychainReadResult(timedOut: true)
+            }
+            return SecurityCLIKeychainReadResult()
         } catch {
             self.log.warning(
                 "Claude keychain security CLI read failed; falling back",
@@ -201,7 +265,7 @@ extension ClaudeOAuthCredentialsStore {
                     "callerInteraction": interactionMetadata,
                     "error_type": String(describing: type(of: error)),
                 ])
-            return nil
+            return SecurityCLIKeychainReadResult()
         }
     }
 
@@ -336,6 +400,14 @@ extension ClaudeOAuthCredentialsStore {
         readStrategy _: ClaudeOAuthKeychainReadStrategy = ClaudeOAuthKeychainReadStrategyPreference.current(),
         environment _: [String: String] = ProcessInfo.processInfo.environment)
         -> Data?
+    {
+        nil
+    }
+
+    static func readClaudeKeychainViaSecurityCLIWithoutPrompt(
+        interaction _: ProviderInteraction,
+        now _: Date = Date(),
+        environment _: [String: String] = ProcessInfo.processInfo.environment) -> Data?
     {
         nil
     }

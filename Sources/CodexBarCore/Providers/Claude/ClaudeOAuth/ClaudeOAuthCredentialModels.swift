@@ -255,6 +255,7 @@ public enum ClaudeOAuthCredentialsError: LocalizedError, Sendable {
     case missingAccessToken
     case notFound
     case keychainAccessRevoked
+    case keychainReadRequiresInteraction
     case keychainError(Int)
     case readFailed(String)
     case refreshFailed(String)
@@ -279,6 +280,10 @@ public enum ClaudeOAuthCredentialsError: LocalizedError, Sendable {
         case .keychainAccessRevoked:
             return "Claude Keychain access was revoked by Claude Code's token rotation. "
                 + "Click Refresh to re-grant access, or switch Claude Usage source to CLI/Web."
+        case .keychainReadRequiresInteraction:
+            return "Claude Code's Keychain item exists, but CodexBar cannot read it without a macOS Keychain prompt "
+                + "(the login Keychain is locked, or the item no longer allows /usr/bin/security). "
+                + "Sign in again with `claude`, or switch Claude Usage source to CLI/Web."
         case let .keychainError(status):
             #if os(macOS)
             if status == Int(errSecUserCanceled)

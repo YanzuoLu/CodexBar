@@ -14,7 +14,8 @@ CodexBar uses several credential sources, but two foreign-owned Keychain items a
   `Chrome Safe Storage`, `Brave Safe Storage`, and `Microsoft Edge Safe Storage`.
 - Claude OAuth repair can read Claude Code's `Claude Code-credentials` item. Direct access to that foreign item is
   off by default and requires explicit consent in Claude's provider settings. The default prompt policy reserves
-  interactive repair for a user action.
+  interactive repair for a user action. With consent, CodexBar first reads it through `/usr/bin/security` when a no-UI ACL and
+  partition preflight shows that tool can decrypt it without UI (Claude Code's default); that read never prompts.
 
 CodexBar does not need the browser or Claude account password. macOS owns the authorization prompt and should name
 the requesting app or binary. Never send a Keychain item value, cookie header, OAuth token, API key, or password in a
