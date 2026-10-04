@@ -270,6 +270,15 @@ extension CodexBarCLI {
         return output
     }
 
+    /// The provider's usage. Codex reports its monthly credit limit with credits; attaching it as the usage cost,
+    /// like the app does, lets text and JSON render it with the other cost caps.
+    private static func scopedUsage(_ result: ProviderFetchResult, provider: UsageProvider) -> UsageSnapshot {
+        let usage = result.usage.scoped(to: provider)
+        // Provider-specific by design: only Codex carries its cost cap on the credits snapshot.
+        guard provider == .codex, result.credits?.codexCreditLimit != nil else { return usage }
+        return CodexExtraUsageCost.attaching(to: usage, credits: result.credits)
+    }
+
     // swiftlint:disable:next function_parameter_count
     private static func makeUsagePayload(
         provider: UsageProvider,
@@ -440,7 +449,7 @@ extension CodexBarCLI {
                 command: command)
             await Self.emitAugmentDebugIfNeeded(provider: provider, command: command)
 
-            var usage = result.usage.scoped(to: provider)
+            var usage = Self.scopedUsage(result, provider: provider)
             if let account {
                 usage = usage.withAccountLabel(account.label, for: provider)
             } else if let codexVisibleAccount {

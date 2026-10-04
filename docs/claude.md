@@ -174,6 +174,11 @@ the cookie import.
   - `seven_day_routines` / `seven_day_cowork` → Daily Routines extra window.
   - Claude Design/Omelette keys are ignored because Claude Design shares the main Claude usage limit.
   - `extra_usage` → Extra usage cost (monthly spend/limit).
+  - The Extra usage section shows the cap's percent in the used/remaining preference. When the cap has a reset date,
+    it also shows the reset and calendar-month pace (marker on the bar, text below the spend line).
+  - Accounts with no session or weekly window (for example Claude Enterprise) report a spend limit without a reset
+    date; it resets at the start of the next local calendar month. The menu bar, merged-menu switcher, and widgets
+    show its percent, and the CLI `Cost:` line adds percent, pace, and reset.
 - Preferences → Providers → Claude → Visible usage items lets you hide the Daily Routines row in menus, the Settings
   preview, and Overview. The global optional credits and extra usage setting remains its master switch. Hiding this
   row does not change fetching, history, notifications, widgets, model-scoped weekly limits, hooks, or CLI output.

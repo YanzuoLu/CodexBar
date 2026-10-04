@@ -10,6 +10,7 @@
 
 - Codex: continue bounded local-history discovery before sleeping so validated current-day tokens can publish promptly during catch-up, while preserving power limits and complete-window checks (#3508). Thanks @kernnel!
 - Claude: with direct-read consent, read `Claude Code-credentials` through `/usr/bin/security` in background and CLI refreshes when the item's access list and partition list already admit that tool, so OAuth works without a Keychain prompt; an unreadable item now reports that it exists but needs a prompt instead of "credentials not found".
+- Claude/Codex: the Extra usage section shows a monthly cap's percent in the used/remaining preference, its reset time, and calendar-month pace; Claude Enterprise spend limits reset at the start of the next local month, and the merged-menu switcher shows their bar. CLI `Cost:` lines add the percent, pace, and reset, and JSON adds `usage.providerCost.usedPercent` and `pace.providerCost`.
 - Browser cookies: adopt SweetCookieKit 0.5.5 for Aside, Opera, and Opera Neon support, including Cursor account switching, and let Muse (muse.ai) automatically import from the full supported browser catalog (#4215, #2429). Thanks @mvicari!
 
 ## 0.71.1 — 2026-10-03

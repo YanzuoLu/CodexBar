@@ -161,6 +161,9 @@ struct UsageMenuCardView: View {
             var presentation: Presentation = .detail
             var showsInProviderDetails = true
             var percentStyle: PercentStyle = .used
+            /// Reset and pace of a monthly cap; set by `withMonthlyCapCycle(window:input:paceVisible:)`.
+            var resetText: String?
+            var pace: PaceDetail?
         }
 
         let provider: UsageProvider
@@ -892,7 +895,11 @@ extension UsageMenuCardView.Model {
                 style: providerCostStyle,
                 percentStyle: input.usageBarsShowUsed ? .used : .left,
                 isClaudeAdminAPI: isClaudeAdminAPI,
-                preferredCurrencyCode: input.preferredCurrencyCode)
+                preferredCurrencyCode: input.preferredCurrencyCode)?
+                .withMonthlyCapCycle(
+                    window: costPresentation?.monthlyCapWindow(for: extraUsageCost),
+                    input: input,
+                    paceVisible: paceVisible)
         }
         let tokenUsageSnapshot = Self.tokenUsageSnapshot(input: input)
         let tokenUsage = Self.tokenUsageSection(

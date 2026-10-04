@@ -191,12 +191,16 @@ public enum ClaudeProviderDescriptor {
                     return ProviderCostPresentation(
                         showsGenericFallback: !(cost.used == 0 && cost.limit == 0 && cost.balance != nil),
                         balances: balances,
-                        menuCardStyle: .claude)
+                        menuCardStyle: .claude,
+                        // Extra usage is a monthly cap.
+                        limitResetsMonthly: true)
                 },
                 iconDecorations: [.notches],
                 reservesMissingSecondaryIconLane: true,
                 automaticSelectionPrioritizesExhaustedWindow: false,
                 menuBarWindowResolver: self.menuBarWindow,
+                // Spend-limit-only accounts (Claude Enterprise) have no weekly lane for the switcher bar.
+                switcherUsedPercentFallback: { $0.claudeSpendLimitWindow?.usedPercent },
                 planUtilizationSeriesResolver: { snapshot in
                     var series: Set<ProviderPlanUtilizationSeries> = []
                     if snapshot.primary != nil {
@@ -235,8 +239,7 @@ public enum ClaudeProviderDescriptor {
               context.snapshot.tertiary == nil,
               context.snapshot.primary == nil || context.snapshot.primary?.isSyntheticPlaceholder == true
         else { return .unhandled }
-        let window = context.snapshot.claudeScopedWeeklyWindow?.window
-            ?? context.snapshot.providerCost.flatMap { $0.limit > 0 ? $0.spendLimitWindow : nil }
+        let window = context.snapshot.claudeScopedWeeklyWindow?.window ?? context.snapshot.claudeSpendLimitWindow
         return .resolved(window)
     }
 
@@ -731,7 +734,7 @@ struct ClaudeOAuthFetchStrategy: ProviderFetchStrategy {
            let credentialsError = error as? ClaudeOAuthCredentialsError
         {
             switch credentialsError {
-            case .notFound, .refreshDelegatedToClaudeCLI:
+            case .notFound, .keychainReadRequiresInteraction, .refreshDelegatedToClaudeCLI:
                 return true
             default:
                 break

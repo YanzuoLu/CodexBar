@@ -87,17 +87,35 @@ public struct ProviderCostPresentation: Sendable, Equatable {
     public let menuCardStyle: ProviderCostMenuCardStyle
     /// Detail rows replaced by the visible cost summary, keyed by section title.
     public let replacedDetailRows: [String: Set<String>]
+    /// The cost limit is a monthly cap whose `resetsAt` ends a calendar-month cycle. Providers whose budgets
+    /// declare no cadence leave it false, so they get no reset window or pace.
+    public let limitResetsMonthly: Bool
 
     public init(
         showsGenericFallback: Bool = true,
         balances: [Balance] = [],
         menuCardStyle: ProviderCostMenuCardStyle = .generic,
-        replacedDetailRows: [String: Set<String>] = [:])
+        replacedDetailRows: [String: Set<String>] = [:],
+        limitResetsMonthly: Bool = false)
     {
         self.showsGenericFallback = showsGenericFallback
         self.balances = balances
         self.menuCardStyle = menuCardStyle
         self.replacedDetailRows = replacedDetailRows
+        self.limitResetsMonthly = limitResetsMonthly
+    }
+
+    /// The cost cap as a monthly reset window for its reset text and calendar-month pace.
+    /// Nil unless the limit resets monthly, is positive, and has a known reset date.
+    public func monthlyCapWindow(for cost: ProviderCostSnapshot?) -> RateWindow? {
+        guard self.limitResetsMonthly,
+              let cost, let window = cost.spendLimitWindow, let resetsAt = cost.resetsAt
+        else { return nil }
+        return RateWindow(
+            usedPercent: window.usedPercent,
+            windowMinutes: ProviderPaceCapability.monthlyWindowSentinelMinutes,
+            resetsAt: resetsAt,
+            resetDescription: nil)
     }
 }
 

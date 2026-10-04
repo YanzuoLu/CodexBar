@@ -51,6 +51,29 @@ public struct ProviderCostSnapshot: Equatable, Codable, Sendable {
         self.balanceIsUnavailable = nil
     }
 
+    private enum DerivedCodingKeys: String, CodingKey {
+        case usedPercent
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.used, forKey: .used)
+        try container.encode(self.limit, forKey: .limit)
+        try container.encode(self.currencyCode, forKey: .currencyCode)
+        try container.encodeIfPresent(self.period, forKey: .period)
+        try container.encodeIfPresent(self.resetsAt, forKey: .resetsAt)
+        try container.encodeIfPresent(self.nextRegenAmount, forKey: .nextRegenAmount)
+        try container.encodeIfPresent(self.personalUsed, forKey: .personalUsed)
+        try container.encodeIfPresent(self.balance, forKey: .balance)
+        try container.encodeIfPresent(self.balanceUpdatedAt, forKey: .balanceUpdatedAt)
+        try container.encodeIfPresent(self.balanceIsWorkspace, forKey: .balanceIsWorkspace)
+        try container.encode(self.updatedAt, forKey: .updatedAt)
+        try container.encodeIfPresent(self.balanceIsUnavailable, forKey: .balanceIsUnavailable)
+        // Encode-only: the capped spend percent, matching the rate windows' `usedPercent`.
+        var derived = encoder.container(keyedBy: DerivedCodingKeys.self)
+        try derived.encodeIfPresent(self.spendLimitWindow?.usedPercent, forKey: .usedPercent)
+    }
+
     /// Projects a positive spend budget into a quota meter without assigning it a time-window cadence.
     package var spendLimitWindow: RateWindow? {
         guard self.limit > 0 else { return nil }

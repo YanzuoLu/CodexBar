@@ -485,8 +485,25 @@ enum CLIRenderer {
                 weeklyWorkDays: weeklyWorkDays,
                 now: now)
         }
-        guard primary != nil || secondary != nil || tertiary != nil else { return nil }
-        return ProviderPacePayload(primary: primary, secondary: secondary, tertiary: tertiary)
+        let providerCost = self.monthlyCapWindow(provider: provider, snapshot: snapshot).flatMap {
+            self.pacePayload(
+                provider: provider,
+                window: $0,
+                slot: .primary,
+                capability: .calendarMonthResetWindow,
+                now: now)
+        }
+        guard primary != nil || secondary != nil || tertiary != nil || providerCost != nil else { return nil }
+        return ProviderPacePayload(
+            primary: primary,
+            secondary: secondary,
+            tertiary: tertiary,
+            providerCost: providerCost)
+    }
+
+    private static func monthlyCapWindow(provider: UsageProvider, snapshot: UsageSnapshot) -> RateWindow? {
+        ProviderDescriptorRegistry.descriptor(for: provider).presentation.cost(snapshot: snapshot)
+            .monthlyCapWindow(for: snapshot.providerCost)
     }
 
     static func rateLine(title: String, window: RateWindow, useColor: Bool) -> String {
@@ -521,12 +538,51 @@ enum CLIRenderer {
             return
         }
 
-        let presentation = ProviderDescriptorRegistry.descriptor(for: provider).presentation.cost(snapshot: snapshot)
+        self.appendCostFallbackLines(provider: provider, snapshot: snapshot, context: context, now: now, lines: &lines)
+    }
+
+    /// Cost/quota display when there is no primary rate window: a capped cost adds its percent, and a monthly cap
+    /// with a reset date adds its calendar-month pace and reset.
+    private static func appendCostFallbackLines(
+        provider: UsageProvider,
+        snapshot: UsageSnapshot,
+        context: RenderContext,
+        now: Date,
+        lines: inout [String])
+    {
+        let descriptor = ProviderDescriptorRegistry.descriptor(for: provider)
+        let presentation = descriptor.presentation.cost(snapshot: snapshot)
         guard presentation.showsGenericFallback, let cost = snapshot.providerCost else { return }
-        // Fallback to cost/quota display if no primary rate window.
         let label = cost.currencyCode == "Quota" ? "Quota" : "Cost"
-        let value = "\(String(format: "%.1f", cost.used)) / \(String(format: "%.1f", cost.limit))"
+        var value = "\(String(format: "%.1f", cost.used)) / \(String(format: "%.1f", cost.limit))"
+        if let capWindow = cost.spendLimitWindow {
+            let percent = UsageFormatter.usageLine(
+                remaining: capWindow.remainingPercent,
+                used: capWindow.usedPercent,
+                showUsed: false)
+            let colored = self.colorizeUsage(
+                percent,
+                remainingPercent: capWindow.remainingPercent,
+                useColor: context.useColor)
+            let bar = self.usageBar(remainingPercent: capWindow.remainingPercent, useColor: context.useColor)
+            value += " · \(colored) \(bar)"
+        }
         lines.append(self.labelValueLine(label, value: value, useColor: context.useColor))
+        guard let monthlyCap = presentation.monthlyCapWindow(for: cost) else { return }
+        if descriptor.pace.allowsPace(dataConfidence: snapshot.dataConfidence),
+           let pace = self.paceLine(
+               provider: provider,
+               window: monthlyCap,
+               slot: .primary,
+               capability: .calendarMonthResetWindow,
+               useColor: context.useColor,
+               now: now)
+        {
+            lines.append(pace)
+        }
+        if let reset = UsageFormatter.resetLine(for: monthlyCap, style: context.resetStyle, now: now) {
+            lines.append(self.subtleLine(reset, useColor: context.useColor))
+        }
     }
 
     // swiftlint:disable:next function_parameter_count
@@ -879,14 +935,17 @@ enum CLIRenderer {
         let kind: ProviderPaceKind
     }
 
+    /// - Parameter capability: Overrides the provider's pace capability for a window whose cadence its source
+    ///   defines, such as a monthly cost cap.
     private static func computePace(
         provider: UsageProvider,
         window: RateWindow,
         slot: ProviderPaceSlot,
         weeklyWorkDays: Int? = nil,
+        capability: ProviderPaceCapability? = nil,
         now: Date) -> PaceComputation?
     {
-        let capability = ProviderDescriptorRegistry.descriptor(for: provider).pace
+        let capability = capability ?? ProviderDescriptorRegistry.descriptor(for: provider).pace
         guard let resolvedKind = capability.resolvedKind(slot: slot, window: window, now: now) else { return nil }
         let paceWindow: RateWindow = if capability.supportsResetWindowPace(window: window, now: now) {
             capability.resolvedResetWindowForPace(window)
@@ -926,6 +985,7 @@ enum CLIRenderer {
         window: RateWindow,
         slot: ProviderPaceSlot,
         weeklyWorkDays: Int? = nil,
+        capability: ProviderPaceCapability? = nil,
         useColor: Bool,
         now: Date) -> String?
     {
@@ -934,6 +994,7 @@ enum CLIRenderer {
             window: window,
             slot: slot,
             weeklyWorkDays: weeklyWorkDays,
+            capability: capability,
             now: now) else { return nil }
         let label = self.label("Pace", useColor: useColor)
         let summary = self.paceSummary(
@@ -949,6 +1010,7 @@ enum CLIRenderer {
         window: RateWindow,
         slot: ProviderPaceSlot,
         weeklyWorkDays: Int? = nil,
+        capability: ProviderPaceCapability? = nil,
         now: Date) -> PacePayload?
     {
         guard let computation = self.computePace(
@@ -956,6 +1018,7 @@ enum CLIRenderer {
             window: window,
             slot: slot,
             weeklyWorkDays: weeklyWorkDays,
+            capability: capability,
             now: now) else { return nil }
         return PacePayload(
             stage: Self.stageString(computation.pace.stage),

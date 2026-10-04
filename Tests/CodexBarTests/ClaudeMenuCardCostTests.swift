@@ -12,7 +12,7 @@ struct ClaudeMenuCardCostTests {
         (used: 100.0, percent: 100.0, spend: "$100.00"),
         (used: 125.0, percent: 100.0, spend: "$125.00"),
     ], [false, true])
-    func `claude capped extra usage fill follows the preference without changing spend`(
+    func `claude capped extra usage fill and percent follow the preference without changing spend`(
         sample: (used: Double, percent: Double, spend: String),
         showUsed: Bool) throws
     {
@@ -24,7 +24,9 @@ struct ClaudeMenuCardCostTests {
         #expect(section.percentStyle == (showUsed ? .used : .left))
         #expect(section.progressAccessibilityLabel == (showUsed ? "Extra usage spent" : "Usage remaining"))
         #expect(section.spendLine == "Monthly cap: \(sample.spend) / $100.00")
-        #expect(section.percentLine == "\(Int(sample.percent))% used")
+        #expect(section.percentLine == (showUsed
+                ? "\(Int(sample.percent))% used"
+                : "\(100 - Int(sample.percent))% left"))
     }
 
     @Test(arguments: [false, true])
@@ -37,7 +39,7 @@ struct ClaudeMenuCardCostTests {
         #expect(section.spendLine == "Monthly cap: $5.00 / $20.00")
         #expect(section.percentUsed == 25)
         #expect(section.displayPercent == (showUsed ? 25 : 75))
-        #expect(section.percentLine == "25% used")
+        #expect(section.percentLine == (showUsed ? "25% used" : "75% left"))
         #expect(section.presentation == .detail)
         #expect(section.showsInProviderDetails == false)
     }
@@ -121,7 +123,7 @@ struct ClaudeMenuCardCostTests {
         let displayPercent = try #require(section.displayPercent)
         #expect(abs(percentUsed - 0.98) < 0.0001)
         #expect(abs(displayPercent - (showUsed ? 0.98 : 99.02)) < 0.0001)
-        #expect(section.percentLine == "1% used")
+        #expect(section.percentLine == (showUsed ? "<1% used" : "99% left"))
         #expect(section.presentation == .detail)
         #expect(section.showsInProviderDetails == false)
     }

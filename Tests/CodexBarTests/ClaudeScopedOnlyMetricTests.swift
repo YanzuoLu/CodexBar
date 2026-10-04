@@ -29,7 +29,7 @@ struct ClaudeScopedOnlyMetricTests {
         let selected = MenuBarMetricWindowResolver.rateWindow(
             preference: preference, provider: .claude, snapshot: snapshot, supportsAverage: false, now: Self.now)
         #expect(selected == scoped.window)
-        #expect(MenuBarMetricWindowResolver.claudeSpendLimitWindow(snapshot: snapshot) == nil)
+        #expect(snapshot.claudeSpendLimitWindow == nil)
     }
 
     @MainActor

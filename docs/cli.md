@@ -324,6 +324,17 @@ Activity: Auto top-up: visa
 Note: Using CLI fallback
 ```
 
+Accounts without a session or weekly window print their spend cap as a `Cost:` line with its percent. Monthly caps
+(Claude extra usage and Enterprise spend limit, Codex monthly credit limit) with a reset date add calendar-month pace
+and the reset:
+```
+== Claude (oauth) ==
+Cost: 1042.2 / 10000.0 · 90% left [==========--]
+Pace: On pace | Expected 11% used | Lasts until reset
+Resets in 27d 12h
+```
+In JSON, `usage.providerCost.usedPercent` carries the capped percent and `pace.providerCost` the monthly cap's pace.
+
 ### Sample output (JSON, pretty)
 ```json
 {

@@ -120,6 +120,9 @@ struct ProviderPacePayload: Encodable {
     let primary: PacePayload?
     let secondary: PacePayload?
     let tertiary: PacePayload?
+    /// Calendar-month pace of a monthly cost cap (`usage.providerCost`), such as Claude extra usage or the Codex
+    /// monthly credit limit.
+    let providerCost: PacePayload?
 }
 
 struct PacePayload: Encodable {

@@ -138,6 +138,7 @@ extension UsageMenuCardView.Model.ProviderCostSection {
             MenuCardHeightFingerprint.field("title", self.title),
             MenuCardHeightFingerprint.field("spend", self.spendLine),
             MenuCardHeightFingerprint.field("percentLine", self.percentLine),
+            MenuCardHeightFingerprint.field("cycle", self.cycleLine),
             MenuCardHeightFingerprint.field("personalSpend", self.personalSpendLine),
             self.percentUsed == nil ? "percent=0" : "percent=1",
         ])

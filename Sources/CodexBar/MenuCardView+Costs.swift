@@ -41,7 +41,9 @@ struct ProviderCostContent: View {
                     UsageProgressBar(
                         percent: percent,
                         tint: self.progressColor,
-                        accessibilityLabel: self.section.progressAccessibilityLabel)
+                        accessibilityLabel: self.section.progressAccessibilityLabel,
+                        pacePercent: self.section.pace?.pacePercent,
+                        paceOnTop: self.section.pace?.paceOnTop ?? true)
                 }
                 HStack(alignment: .firstTextBaseline) {
                     Text(self.section.spendLine).font(.footnote).lineLimit(1)
@@ -52,6 +54,12 @@ struct ProviderCostContent: View {
                             .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
                             .lineLimit(1)
                     }
+                }
+                if let cycleLine = self.section.cycleLine {
+                    Text(cycleLine)
+                        .font(.footnote)
+                        .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                        .lineLimit(2)
                 }
                 if let personalSpendLine = self.section.personalSpendLine {
                     Text(personalSpendLine)
@@ -74,6 +82,34 @@ extension UsageMenuCardView.Model.ProviderCostSection {
 
     var progressAccessibilityLabel: String {
         self.percentStyle == .used ? L("Extra usage spent") : self.percentStyle.accessibilityLabel
+    }
+
+    /// Reset and pace text below the spend line, joined like a usage row's detail line.
+    var cycleLine: String? {
+        let parts = [self.resetText, self.pace?.leftLabel, self.pace?.rightLabel].compactMap(\.self)
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Adds the reset text and calendar-month pace of a monthly cap
+    /// (see `ProviderCostPresentation.monthlyCapWindow(for:)`).
+    func withMonthlyCapCycle(
+        window: RateWindow?,
+        input: UsageMenuCardView.Model.Input,
+        paceVisible: Bool) -> Self
+    {
+        guard let window, self.percentUsed != nil else { return self }
+        var result = self
+        result.resetText = UsageMenuCardView.Model.resetText(
+            for: window,
+            style: input.resetTimeDisplayStyle,
+            now: input.now)
+        if paceVisible {
+            result.pace = UsageMenuCardView.Model.resetWindowPaceDetail(
+                window: window,
+                input: input,
+                capability: .calendarMonthResetWindow)
+        }
+        return result
     }
 
     static func inlineBalance(title: String, value: String, showsInProviderDetails: Bool = true) -> Self {
@@ -573,7 +609,7 @@ extension UsageMenuCardView.Model {
                 title: L("Extra usage"),
                 percentUsed: percentUsed,
                 spendLine: "\(periodLabel): \(used) / \(limit)",
-                percentLine: String(format: L("%.0f%% used"), min(100, max(0, percentUsed))),
+                percentLine: Self.costPercentLine(percentUsed: percentUsed, style: percentStyle),
                 balanceLine: balanceLine,
                 showsInProviderDetails: false,
                 percentStyle: percentStyle)
@@ -682,10 +718,15 @@ extension UsageMenuCardView.Model {
             title: L("Extra usage"),
             percentUsed: percentUsed,
             spendLine: "\(periodLabel): \(used) / \(limit)",
-            percentLine: String(format: L("%.0f%% used"), min(100, max(0, percentUsed))),
+            percentLine: Self.costPercentLine(percentUsed: percentUsed, style: percentStyle),
             balanceLine: balanceLine,
             showsInProviderDetails: false,
             percentStyle: percentStyle)
+    }
+
+    /// The spend percent in the same used/remaining wording as the usage rows.
+    private static func costPercentLine(percentUsed: Double, style: PercentStyle) -> String {
+        UsageFormatter.percentText(style == .used ? percentUsed : 100 - percentUsed, suffix: style.labelSuffix)
     }
 
     private static func localizedPeriodLabel(_ label: String) -> String {

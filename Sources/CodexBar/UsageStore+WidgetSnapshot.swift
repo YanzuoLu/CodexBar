@@ -469,7 +469,7 @@ extension UsageStore {
             }
         }
         if provider == .claude,
-           let spendLimit = MenuBarMetricWindowResolver.claudeSpendLimitWindow(snapshot: snapshot)
+           let spendLimit = snapshot.claudeSpendLimitWindow
         {
             let period = snapshot.providerCost?.period?.trimmingCharacters(in: .whitespacesAndNewlines)
             let title = period.flatMap { $0.isEmpty ? nil : $0 } ?? "Extra usage"

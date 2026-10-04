@@ -1121,13 +1121,17 @@ extension ClaudeUsageFetcher {
             used: used,
             limit: limit,
             treatAsMajorUnits: false)
+        let now = Date()
+        // The usage API omits the reset date; a spend-limit-only account's monthly limit resets at the start of
+        // the next local calendar month, which also gives its pace a real cycle.
+        let resetsAt = treatAsSpendLimit ? Calendar.current.dateInterval(of: .month, for: now)?.end : nil
         return ProviderCostSnapshot(
             used: normalized.used,
             limit: normalized.limit,
             currencyCode: code,
             period: isSpendLimit ? "Spend limit" : "Monthly cap",
-            resetsAt: nil,
-            updatedAt: Date())
+            resetsAt: resetsAt,
+            updatedAt: now)
     }
 
     private static func oauthSpendLimitWindow(

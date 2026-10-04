@@ -115,7 +115,9 @@ public enum CodexProviderDescriptor {
                     return ProviderCostPresentation(
                         showsGenericFallback: !(cost.used == 0 && cost.limit == 0),
                         balances: balances,
-                        menuCardStyle: .creditsUsage)
+                        menuCardStyle: .creditsUsage,
+                        // spend_control's individual limit is a monthly cap.
+                        limitResetsMonthly: true)
                 },
                 creditResolver: { $0.displayRemaining },
                 iconWindowResolver: self.iconWindows,

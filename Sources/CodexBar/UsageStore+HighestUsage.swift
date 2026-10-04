@@ -86,7 +86,7 @@ extension UsageStore {
             // the spend-limit window, so reaching here (metricPercent >= 100) means the spend limit itself
             // is exhausted. Mirror that resolver fallback and exclude, instead of inspecting the raw 0%
             // placeholder primary that would otherwise keep it eligible.
-            if provider == .claude, MenuBarMetricWindowResolver.claudeSpendLimitWindow(snapshot: snapshot) != nil {
+            if provider == .claude, snapshot.claudeSpendLimitWindow != nil {
                 return true
             }
             // Ignore synthesized placeholder lanes (e.g. Claude web's null `five_hour` 0% session) so a

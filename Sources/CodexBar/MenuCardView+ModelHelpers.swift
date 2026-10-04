@@ -525,6 +525,7 @@ extension UsageMenuCardView.Model {
             current.title == candidate.title &&
                 (current.percentUsed == nil) == (candidate.percentUsed == nil) &&
                 (current.percentLine == nil) == (candidate.percentLine == nil) &&
+                (current.cycleLine == nil) == (candidate.cycleLine == nil) &&
                 (current.personalSpendLine == nil) == (candidate.personalSpendLine == nil)
         default:
             false
@@ -844,16 +845,20 @@ extension UsageMenuCardView.Model {
         return pace.expectedUsedPercent >= 3 || pace.etaSeconds == 0 ? pace : nil
     }
 
+    /// - Parameter capability: Overrides the provider's pace capability for windows whose cadence the row itself
+    ///   defines, such as a monthly cost cap that resets at a calendar-month boundary.
     static func resetWindowPaceDetail(
         window: RateWindow,
         input: Input,
-        pace: UsagePace? = nil) -> PaceDetail?
+        pace: UsagePace? = nil,
+        capability: ProviderPaceCapability? = nil) -> PaceDetail?
     {
-        let capability = ProviderDescriptorRegistry.descriptor(for: input.provider).pace
+        let capability = capability ?? ProviderDescriptorRegistry.descriptor(for: input.provider).pace
         guard capability.supportsResetWindowPace(window: window, now: input.now),
               window.remainingPercent > 0
         else { return nil }
-        let paceWindow = Self.resetWindowForPace(provider: input.provider, window: window)
+        // Provider snapshots use 30 days as a monthly sentinel; use the reset date for the real calendar-cycle length.
+        let paceWindow = capability.resolvedResetWindowForPace(window)
         // A caller-supplied pace was measured against the raw window, so reuse it only when resolution
         // left the duration alone. Trusting it for a monthly sentinel would score the billing period as
         // a flat 30 days and silently undo the calendar-cycle resolution one line above.
@@ -870,11 +875,6 @@ extension UsageMenuCardView.Model {
             now: input.now,
             pace: resolved,
             showUsed: input.usageBarsShowUsed)
-    }
-
-    private static func resetWindowForPace(provider: UsageProvider, window: RateWindow) -> RateWindow {
-        // Provider snapshots use 30 days as a monthly sentinel; use the reset date for the real calendar-cycle length.
-        ProviderDescriptorRegistry.descriptor(for: provider).pace.resolvedResetWindowForPace(window)
     }
 
     static func antigravityMetrics(input: Input, snapshot: UsageSnapshot) -> [Metric] {

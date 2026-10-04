@@ -1139,7 +1139,7 @@ extension StatusItemController {
         // empty or 0% placeholder lane under the combined metric.
         if provider == .claude,
            let snapshot,
-           MenuBarMetricWindowResolver.claudeSpendLimitWindow(snapshot: snapshot) != nil
+           snapshot.claudeSpendLimitWindow != nil
         {
             return nil
         }
