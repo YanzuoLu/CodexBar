@@ -861,7 +861,8 @@ extension UsageStore {
         override: TokenAccountOverride?,
         codexActiveSourceOverride: CodexActiveSource? = nil,
         includeCredits: Bool = false,
-        claudeOwnerCLIRecoveryOnly: Bool = false) -> ProviderFetchContext
+        claudeOwnerCLIRecoveryOnly: Bool = false,
+        claudeVerifiesOAuthAccount: Bool = false) -> ProviderFetchContext
     {
         let account = ProviderTokenAccountSelection.selectedAccount(
             provider: provider,
@@ -956,6 +957,7 @@ extension UsageStore {
             },
             costUsageHistoryDays: self.settings.costUsageHistoryDays,
             claudeOwnerCLIRecoveryOnly: claudeOwnerCLIRecoveryOnly,
+            claudeVerifiesOAuthAccount: claudeVerifiesOAuthAccount,
             persistsCLISessions: true,
             persistentCLISessionIdleWindow: ProviderRegistry.persistentCLISessionIdleWindow(
                 refreshInterval: self.normalRefreshIntervalForHeuristics()),

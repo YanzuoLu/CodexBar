@@ -566,7 +566,8 @@ struct CodexOAuthFetchStrategy: ProviderFetchStrategy {
             claudeOAuthCredentialOwner: result.claudeOAuthCredentialOwner,
             claudeOAuthKeychainCredentialMismatch: result.claudeOAuthKeychainCredentialMismatch,
             claudeOAuthKeychainCredentialAbsent: result.claudeOAuthKeychainCredentialAbsent,
-            claudeOAuthKeychainCredentialUnavailable: result.claudeOAuthKeychainCredentialUnavailable)
+            claudeOAuthKeychainCredentialUnavailable: result.claudeOAuthKeychainCredentialUnavailable,
+            claudeOAuthAccountUuid: result.claudeOAuthAccountUuid)
     }
 
     private static func applyingWorkspaceRemainingBalance(

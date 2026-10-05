@@ -49,6 +49,9 @@ public struct ProviderFetchContext: Sendable {
     /// Restricts a Claude retry to the credential-owning CLI after an ambient account mismatch rejects OAuth.
     /// The original source mode remains intact so background interaction gates still apply.
     public let claudeOwnerCLIRecoveryOnly: Bool
+    /// Requests the OAuth profile account UUID for an ambient Claude fetch whose active account no longer matches
+    /// the persisted identity, so a result proven to belong to the active account can replace that identity.
+    public let claudeVerifiesOAuthAccount: Bool
     /// Whether warm CLI helper sessions (such as the managed Antigravity `agy`
     /// process) may outlive a single fetch. True for long-lived hosts (the app,
     /// `codexbar serve`); false for one-shot CLI invocations that should reset
@@ -83,6 +86,7 @@ public struct ProviderFetchContext: Sendable {
         settingsWriter: SettingsWriter? = nil,
         costUsageHistoryDays: Int = 30,
         claudeOwnerCLIRecoveryOnly: Bool = false,
+        claudeVerifiesOAuthAccount: Bool = false,
         persistsCLISessions: Bool = false,
         persistentCLISessionIdleWindow: TimeInterval? = nil,
         resolvedCLIVersion: String? = nil)
@@ -107,6 +111,7 @@ public struct ProviderFetchContext: Sendable {
         self.settingsWriter = settingsWriter
         self.costUsageHistoryDays = max(1, min(365, costUsageHistoryDays))
         self.claudeOwnerCLIRecoveryOnly = claudeOwnerCLIRecoveryOnly
+        self.claudeVerifiesOAuthAccount = claudeVerifiesOAuthAccount
         self.persistsCLISessions = persistsCLISessions
         self.persistentCLISessionIdleWindow = persistentCLISessionIdleWindow
         self.resolvedCLIVersion = resolvedCLIVersion
@@ -152,6 +157,8 @@ public struct ProviderFetchResult: Sendable {
     public let claudeOAuthKeychainCredentialAbsent: Bool
     /// Whether the winning Claude CLI credential could not be compared with Keychain without prompting.
     public let claudeOAuthKeychainCredentialUnavailable: Bool
+    /// Account UUID the OAuth profile reported for the winning credential, when verification was requested.
+    public let claudeOAuthAccountUuid: String?
 
     public init(
         usage: UsageSnapshot,
@@ -169,7 +176,8 @@ public struct ProviderFetchResult: Sendable {
         claudeOAuthCredentialOwner: ClaudeOAuthCredentialOwner? = nil,
         claudeOAuthKeychainCredentialMismatch: Bool = false,
         claudeOAuthKeychainCredentialAbsent: Bool = false,
-        claudeOAuthKeychainCredentialUnavailable: Bool = false)
+        claudeOAuthKeychainCredentialUnavailable: Bool = false,
+        claudeOAuthAccountUuid: String? = nil)
     {
         self.usage = usage
         self.credits = credits
@@ -187,6 +195,7 @@ public struct ProviderFetchResult: Sendable {
         self.claudeOAuthKeychainCredentialMismatch = claudeOAuthKeychainCredentialMismatch
         self.claudeOAuthKeychainCredentialAbsent = claudeOAuthKeychainCredentialAbsent
         self.claudeOAuthKeychainCredentialUnavailable = claudeOAuthKeychainCredentialUnavailable
+        self.claudeOAuthAccountUuid = claudeOAuthAccountUuid
     }
 
     public func markingMonthlyLimitEnrichmentFailed() -> ProviderFetchResult {
@@ -207,7 +216,8 @@ public struct ProviderFetchResult: Sendable {
             claudeOAuthCredentialOwner: self.claudeOAuthCredentialOwner,
             claudeOAuthKeychainCredentialMismatch: self.claudeOAuthKeychainCredentialMismatch,
             claudeOAuthKeychainCredentialAbsent: self.claudeOAuthKeychainCredentialAbsent,
-            claudeOAuthKeychainCredentialUnavailable: self.claudeOAuthKeychainCredentialUnavailable)
+            claudeOAuthKeychainCredentialUnavailable: self.claudeOAuthKeychainCredentialUnavailable,
+            claudeOAuthAccountUuid: self.claudeOAuthAccountUuid)
     }
 
     /// Returns a copy carrying `diagnostic`, preserving every other field.
@@ -228,7 +238,8 @@ public struct ProviderFetchResult: Sendable {
             claudeOAuthCredentialOwner: self.claudeOAuthCredentialOwner,
             claudeOAuthKeychainCredentialMismatch: self.claudeOAuthKeychainCredentialMismatch,
             claudeOAuthKeychainCredentialAbsent: self.claudeOAuthKeychainCredentialAbsent,
-            claudeOAuthKeychainCredentialUnavailable: self.claudeOAuthKeychainCredentialUnavailable)
+            claudeOAuthKeychainCredentialUnavailable: self.claudeOAuthKeychainCredentialUnavailable,
+            claudeOAuthAccountUuid: self.claudeOAuthAccountUuid)
     }
 }
 

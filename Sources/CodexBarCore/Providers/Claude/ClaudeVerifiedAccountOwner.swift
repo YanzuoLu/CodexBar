@@ -17,7 +17,7 @@ enum ClaudeVerifiedAccountOwner {
 }
 
 extension ClaudeUsageSnapshot {
-    func withAccountIdentity(_ accountID: String) -> ClaudeUsageSnapshot {
+    func withAccountIdentity(_ accountID: String?, oauthAccountUuid: String? = nil) -> ClaudeUsageSnapshot {
         ClaudeUsageSnapshot(
             primary: self.primary,
             primaryWindowKind: self.primaryWindowKind,
@@ -38,6 +38,7 @@ extension ClaudeUsageSnapshot {
             oauthKeychainCredentialMismatch: self.oauthKeychainCredentialMismatch,
             oauthKeychainCredentialAbsent: self.oauthKeychainCredentialAbsent,
             oauthKeychainCredentialUnavailable: self.oauthKeychainCredentialUnavailable,
-            accountID: accountID)
+            accountID: accountID,
+            oauthAccountUuid: oauthAccountUuid ?? self.oauthAccountUuid)
     }
 }

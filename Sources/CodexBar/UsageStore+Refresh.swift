@@ -339,14 +339,14 @@ extension UsageStore {
         }
 
         let tokenAccount = self.settings.effectiveSelectedTokenAccount(for: provider)
-        let fetchContext = self.makeFetchContext(
+        let ambientFetchContext = self.makeFetchContext(
             provider: provider,
             override: nil,
             claudeOwnerCLIRecoveryOnly: retryMode == .claudeOwnerCLIRecovery)
-        let claudeHasAdminAPIKey = ClaudeAdminAPISettingsReader.apiKey(environment: fetchContext.env) != nil
+        let claudeHasAdminAPIKey = ClaudeAdminAPISettingsReader.apiKey(environment: ambientFetchContext.env) != nil
         let claudeActiveAccountIdentitySourceEligible = Self.shouldTrackClaudeActiveAccountIdentity(
             provider: provider,
-            dataSource: fetchContext.settings?.claude?.usageDataSource,
+            dataSource: ambientFetchContext.settings?.claude?.usageDataSource,
             hasSelectedTokenAccount: tokenAccount != nil,
             hasAdminAPIKey: claudeHasAdminAPIKey)
         let priorClaudeSourceLabel = provider == .claude ? self.lastSourceLabels[.claude] : nil
@@ -354,8 +354,16 @@ extension UsageStore {
         let claudeAuthStateBeforeFetch = claudeActiveAccountIdentitySourceEligible
             ? await Self.captureClaudeRefreshAuthState(
                 invalidateCredentialsFile: true,
-                environment: fetchContext.env)
+                environment: ambientFetchContext.env)
             : nil
+        let claudeVerifiesOAuthAccount = retryMode != .claudeOwnerCLIRecovery &&
+            self.claudeActiveAccountDiffersFromPersistedIdentity(
+                activeAccountUuid: claudeAuthStateBeforeFetch?.activeAccountUuid,
+                activeAccountIdentity: claudeAuthStateBeforeFetch?.activeAccountIdentity,
+                environment: ambientFetchContext.env)
+        let fetchContext = claudeVerifiesOAuthAccount
+            ? self.makeFetchContext(provider: provider, override: nil, claudeVerifiesOAuthAccount: true)
+            : ambientFetchContext
         let priorTokenAccountSnapshot = self.tokenAccountSnapshot(provider: provider, account: tokenAccount)
         let descriptor = spec.descriptor
         let codexResetCreditsFetcher = self.codexResetCreditsFetcher(workspaceAccountID: fetchContext.codexWorkspaceID)
@@ -538,8 +546,16 @@ extension UsageStore {
             Self.claudeCredentialsChanged(
                 beforeFetch: input.beforeFetch,
                 changedDuringFetch: authChangedDuringFetch) || activeAccountReconciliation.changed)
+        // The OAuth profile can prove that a Claude CLI credential belongs to the active account. Such a result
+        // replaces a stale persisted identity directly, because owner CLI recovery may be unavailable (background
+        // explicit OAuth) or unable to report usage (accounts without a session window).
+        let oauthAccountMatchesActiveAccount = Self.claudeOAuthAccountMatchesActiveAccount(
+            input.outcome,
+            beforeFetch: input.beforeFetch?.activeAccountUuid,
+            afterFetch: historyAccountState.activeAccountUuid)
         let activeAccountMismatch = successfulOAuth && successfulOAuthCredentialOwner == .claudeCLI && (
-            activeAccountChangedDuringFetch || activeAccountReconciliation.changedFromPersistedIdentity)
+            activeAccountChangedDuringFetch ||
+                (activeAccountReconciliation.changedFromPersistedIdentity && !oauthAccountMatchesActiveAccount))
         let quarantinedCredentialsFile = if successfulOAuthCredentialOwner == .claudeCLI {
             await Self.isClaudeCredentialsFileQuarantinedForOAuth(environment: input.environment)
         } else {
@@ -1031,6 +1047,24 @@ extension UsageStore {
             return true
         }
         return false
+    }
+
+    private nonisolated static func claudeOAuthAccountMatchesActiveAccount(
+        _ outcome: ProviderFetchOutcome,
+        beforeFetch: String?,
+        afterFetch: String?) -> Bool
+    {
+        guard case let .success(result) = outcome.result,
+              result.strategyKind == .oauth,
+              let oauthAccount = Self.normalizedClaudeAccountUuid(result.claudeOAuthAccountUuid),
+              let beforeFetch = Self.normalizedClaudeAccountUuid(beforeFetch),
+              Self.normalizedClaudeAccountUuid(afterFetch) == beforeFetch
+        else { return false }
+        return oauthAccount == beforeFetch
+    }
+
+    private nonisolated static func normalizedClaudeAccountUuid(_ uuid: String?) -> String? {
+        CodexIdentityResolver.normalizeAccountID(uuid)?.lowercased()
     }
 
     private nonisolated static func successfulClaudeOAuthCredentialOwner(

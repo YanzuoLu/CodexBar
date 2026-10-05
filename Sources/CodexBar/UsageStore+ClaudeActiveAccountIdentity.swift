@@ -87,6 +87,22 @@ extension UsageStore {
             newestIdentity: afterFetch ?? beforeFetch)
     }
 
+    /// True when Claude's active account differs from the persisted identity. An ambient OAuth fetch then requests
+    /// the profile account UUID so reconciliation can tell a stale credential from a verified account switch.
+    func claudeActiveAccountDiffersFromPersistedIdentity(
+        activeAccountUuid: String?,
+        activeAccountIdentity: String?,
+        environment: [String: String]) -> Bool
+    {
+        guard let activeAccountUuid, let activeAccountIdentity,
+              let persistedIdentity = Self.persistedClaudeActiveAccountIdentity(
+                  defaults: self.settings.userDefaults,
+                  environment: environment,
+                  observedAccountUuids: [activeAccountUuid])
+        else { return false }
+        return persistedIdentity != activeAccountIdentity
+    }
+
     func persistClaudeActiveAccountIdentity(
         _ identity: String?,
         environment: [String: String])

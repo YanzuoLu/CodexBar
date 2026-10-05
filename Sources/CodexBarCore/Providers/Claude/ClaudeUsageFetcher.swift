@@ -39,6 +39,8 @@ public struct ClaudeUsageSnapshot: Sendable {
     public let oauthKeychainCredentialAbsent: Bool
     /// True when a Claude CLI credential won routing but the prompt-free Keychain comparison was unavailable.
     public let oauthKeychainCredentialUnavailable: Bool
+    /// Account UUID reported by the OAuth profile for the credential that produced this usage, when requested.
+    public let oauthAccountUuid: String?
 
     public init(
         primary: RateWindow,
@@ -60,7 +62,8 @@ public struct ClaudeUsageSnapshot: Sendable {
         oauthKeychainCredentialMismatch: Bool = false,
         oauthKeychainCredentialAbsent: Bool = false,
         oauthKeychainCredentialUnavailable: Bool = false,
-        accountID: String? = nil)
+        accountID: String? = nil,
+        oauthAccountUuid: String? = nil)
     {
         self.primary = primary
         self.primaryWindowKind = primaryWindowKind
@@ -82,6 +85,7 @@ public struct ClaudeUsageSnapshot: Sendable {
         self.oauthKeychainCredentialMismatch = oauthKeychainCredentialMismatch
         self.oauthKeychainCredentialAbsent = oauthKeychainCredentialAbsent
         self.oauthKeychainCredentialUnavailable = oauthKeychainCredentialUnavailable
+        self.oauthAccountUuid = oauthAccountUuid
     }
 }
 
@@ -132,6 +136,7 @@ public struct ClaudeUsageFetcher: ClaudeUsageFetching, Sendable {
         let webExtrasTimeout: TimeInterval
         let includePrepaidBalance: Bool
         let includeAccountIdentity: Bool
+        let verifyOAuthAccount: Bool
         let keepCLISessionsAlive: Bool
         let browserDetection: BrowserDetection
     }
@@ -286,6 +291,7 @@ public struct ClaudeUsageFetcher: ClaudeUsageFetching, Sendable {
         webExtrasTimeout: TimeInterval = 15,
         includePrepaidBalance: Bool = false,
         includeAccountIdentity: Bool = false,
+        verifyOAuthAccount: Bool = false,
         keepCLISessionsAlive: Bool = false)
     {
         self.configuration = Configuration(
@@ -302,6 +308,7 @@ public struct ClaudeUsageFetcher: ClaudeUsageFetching, Sendable {
             webExtrasTimeout: webExtrasTimeout,
             includePrepaidBalance: includePrepaidBalance,
             includeAccountIdentity: includeAccountIdentity,
+            verifyOAuthAccount: verifyOAuthAccount,
             keepCLISessionsAlive: keepCLISessionsAlive,
             browserDetection: browserDetection)
     }
@@ -950,16 +957,23 @@ extension ClaudeUsageFetcher {
         to snapshot: ClaudeUsageSnapshot,
         accessToken: String) async throws -> ClaudeUsageSnapshot
     {
-        guard self.configuration.includeAccountIdentity else { return snapshot }
+        guard self.configuration.includeAccountIdentity || self.configuration.verifyOAuthAccount else {
+            return snapshot
+        }
         do {
             let profile = try await Self.fetchOAuthProfile(accessToken: accessToken)
             try Task.checkCancellation()
-            guard let owner = ClaudeVerifiedAccountOwner.ownerID(
-                accountUUID: profile.accountUuid,
-                email: profile.emailAddress,
-                organizationUUID: profile.organizationUuid)
-            else { return snapshot }
-            return snapshot.withAccountIdentity(owner)
+            let owner = self.configuration.includeAccountIdentity
+                ? ClaudeVerifiedAccountOwner.ownerID(
+                    accountUUID: profile.accountUuid,
+                    email: profile.emailAddress,
+                    organizationUUID: profile.organizationUuid)
+                : nil
+            let accountUuid = self.configuration.verifyOAuthAccount
+                ? CodexIdentityResolver.normalizeAccountID(profile.accountUuid)
+                : nil
+            guard owner != nil || accountUuid != nil else { return snapshot }
+            return snapshot.withAccountIdentity(owner ?? snapshot.accountID, oauthAccountUuid: accountUuid)
         } catch {
             try Task.checkCancellation()
             if ClaudeOAuthFetchError.isCancellation(error) { throw error }

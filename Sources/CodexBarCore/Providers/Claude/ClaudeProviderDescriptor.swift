@@ -703,7 +703,8 @@ struct ClaudeOAuthFetchStrategy: ProviderFetchStrategy {
             webOrganizationID: context.settings?.claude?.organizationID,
             webExtrasTimeout: context.webTimeout,
             includePrepaidBalance: includePrepaidBalance,
-            includeAccountIdentity: context.includeAccountIdentity)
+            includeAccountIdentity: context.includeAccountIdentity,
+            verifyOAuthAccount: context.claudeVerifiesOAuthAccount)
         let usage = try await fetcher.loadLatestUsage(model: "sonnet")
         return ProviderFetchResult(
             usage: Self.snapshot(from: usage, includeOptionalUsage: context.includeOptionalUsage),
@@ -717,7 +718,8 @@ struct ClaudeOAuthFetchStrategy: ProviderFetchStrategy {
             claudeOAuthCredentialOwner: usage.oauthCredentialOwner,
             claudeOAuthKeychainCredentialMismatch: usage.oauthKeychainCredentialMismatch,
             claudeOAuthKeychainCredentialAbsent: usage.oauthKeychainCredentialAbsent,
-            claudeOAuthKeychainCredentialUnavailable: usage.oauthKeychainCredentialUnavailable)
+            claudeOAuthKeychainCredentialUnavailable: usage.oauthKeychainCredentialUnavailable,
+            claudeOAuthAccountUuid: usage.oauthAccountUuid)
     }
 
     func shouldFallback(on error: Error, context: ProviderFetchContext) -> Bool {
